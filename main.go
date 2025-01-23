@@ -2,23 +2,22 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"go/build"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/ghodss/yaml"
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
+	"github.com/cmars/greenroom/pkg/mkdocs"
 	"github.com/princjef/gomarkdoc"
 	"github.com/princjef/gomarkdoc/lang"
 	"github.com/princjef/gomarkdoc/logger"
 	"golang.org/x/tools/go/packages"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -38,7 +37,7 @@ func main() {
 		log.Fatalf("failed to load packages: %v", err)
 	}
 
-	mkDocs := NewMkDocs()
+	mkDocs := mkdocs.NewMkDocs()
 	for _, pkg := range pkgs {
 		if pkg.Name == "main" {
 			// skip main packages (binaries)
@@ -76,7 +75,7 @@ func main() {
 				mkDocs.SiteName = filepath.Base(pkg.Module.Dir)
 			}
 			docLinkPath := doc.DocBase(".")
-			mkDocs.Nav = append(mkDocs.Nav, NavItem{
+			mkDocs.Nav = append(mkDocs.Nav, mkdocs.NavItem{
 				Name: pkg.PkgPath,
 				Path: docLinkPath + ".md",
 			})
@@ -89,8 +88,8 @@ func main() {
 
 	mkDocsPath := filepath.Join(*outputDir, "mkdocs.yml")
 
-	existing := map[string]interface{}{}
-	if existingContent, err := ioutil.ReadFile(mkDocsPath); err == nil {
+	existing := mkdocs.MkDocs{}
+	if existingContent, err := os.ReadFile(mkDocsPath); err == nil {
 		err = yaml.Unmarshal(existingContent, &existing)
 		if err != nil {
 			log.Fatal(err)
@@ -98,17 +97,8 @@ func main() {
 	} else if !os.IsNotExist(err) {
 		log.Fatal(err)
 	}
-	update := map[string]interface{}{}
-	updateContent, err := json.Marshal(&mkDocs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(updateContent, &update)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = mergo.Merge(&existing, &update)
+	err = mergo.Merge(&existing, mkDocs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,7 +108,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer mkDocsFile.Close()
-	mkDocsContent, err := yaml.Marshal(existing)
+
+	mkDocsContent, err := yaml.Marshal(&existing)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -126,29 +117,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-type MkDocs struct {
-	SiteName string    `json:"site_name"`
-	Nav      []NavItem `json:"nav"`
-	Plugins  []string  `json:"plugins"`
-}
-
-func NewMkDocs() *MkDocs {
-	return &MkDocs{
-		Plugins: []string{"techdocs-core"},
-	}
-}
-
-type NavItem struct {
-	Name string
-	Path string
-}
-
-func (n *NavItem) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{
-		n.Name: n.Path,
-	})
 }
 
 type PackageDoc struct {
