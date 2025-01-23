@@ -23,6 +23,7 @@ import (
 var (
 	outputDir = flag.String("output", ".", "directory where mkdocs documentation will be created")
 	siteName  = flag.String("site-name", "", "override mkdocs site_name (default is module dirname)")
+	addNav    = flag.Bool("add-nav", false, "add flattened nav links. If you don't specify any existing nav this will prevent accessing your other documents")
 )
 
 func main() {
@@ -75,10 +76,13 @@ func main() {
 				mkDocs.SiteName = filepath.Base(pkg.Module.Dir)
 			}
 			docLinkPath := doc.DocBase(".")
-			mkDocs.Nav = append(mkDocs.Nav, mkdocs.NavItem{
-				Name: pkg.PkgPath,
-				Path: docLinkPath + ".md",
-			})
+
+			if *addNav {
+				mkDocs.Nav = append(mkDocs.Nav, mkdocs.NavItem{
+					Name: pkg.PkgPath,
+					Path: docLinkPath + ".md",
+				})
+			}
 			return nil
 		}()
 		if err != nil {
